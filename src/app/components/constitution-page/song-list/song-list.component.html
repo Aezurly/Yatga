@@ -1,14 +1,17 @@
 <div class="filter">
 	<span class="filter-text"> <b> Filtre des utilisateurs : </b> </span>
-	<img *ngFor="let user of getUsers()" class="picture clickable" matTooltip=" {{user.displayName}}" 
-		[src]="user.photoURL" (click)="toggleUserFilter(user.uid)" [ngClass]="isSelected(user.uid) ? '' : 'black-and-white'">
-	<button mat-raised-button color="primary" (click)="select('all')" class="filter-button" matTooltip="Afficher tous les utilisateurs">
+	<img *ngFor="let user of getUsers()" class="picture clickable" matTooltip=" {{user.displayName}}"
+		[src]="user.photoURL" (click)="toggleUserFilter(user.uid)"
+		[ngClass]="isSelected(user.uid) ? '' : 'black-and-white'">
+	<button mat-raised-button color="primary" (click)="select('all')" class="filter-button"
+		matTooltip="Afficher tous les utilisateurs">
 		<mat-icon>add_circle_outline</mat-icon>
 	</button>
 	<button mat-raised-button color="primary" (click)="select('none')" matTooltip="Cacher tous les utilisateurs">
 		<mat-icon>block</mat-icon>
 	</button>
-	<button mat-raised-button color="primary" class="filter-button" [matMenuTriggerFor]="menu" matTooltip="Classer les chansons">
+	<button mat-raised-button color="primary" class="filter-button" [matMenuTriggerFor]="menu"
+		matTooltip="Classer les chansons">
 		<mat-icon>filter_list</mat-icon>
 	</button>
 	<mat-menu #menu="matMenu">
@@ -33,23 +36,28 @@
 				<div class="card shadow-0 bg-dark z-card">
 					<h3 class="card-header front">
 						<div>
-							{{song.title}}
-							<img src="{{getUser(song.user).photoURL}}" class="image-de picture" matTooltip="{{getUser(song.user).displayName}}">
+							<span [matTooltip]="song.title.translation!"
+								[matTooltipDisabled]="song.title.translation === undefined">{{song.title.original}}</span>
+							<img src="{{getUser(song.user).photoURL}}" class="image-de picture"
+								matTooltip="{{getUser(song.user).displayName}}">
 						</div>
-						<i> {{song.author}} </i> 
+						<i> {{song.author}} </i>
 					</h3>
 					<img src="{{getImageURL(song)}}" class="card-img blur">
 					<div class="card-img-overlay">
 						<div class="card-body">
-							<iframe id="video1" *ngIf="currentIframeSongID === song.id; else loadImage"
-							height="208" frameborder="0" [src]="getSongSafeURL(song)" 
-							allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-							allowfullscreen>
+							<iframe id="video1" *ngIf="currentIframeSongID === song.id; else loadImage" height="208"
+								frameborder="0" [src]="getSongSafeURL(song)"
+								allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+								allowfullscreen>
 							</iframe>
 							<ng-template #loadImage>
-								<img src="{{getImageURL(song)}}" height="208" class="iframe-image" (click)="updateCurrentIframeSong(song)">
+								<img src="{{getImageURL(song)}}" height="208" class="iframe-image"
+									(click)="updateCurrentIframeSong(song)">
 								<div class="centered">
-									<button mat-raised-button color="primary" (click)="updateCurrentIframeSong(song)"> <mat-icon>play_arrow</mat-icon></button>
+									<button mat-raised-button color="primary" (click)="updateCurrentIframeSong(song)">
+										<mat-icon>play_arrow</mat-icon>
+									</button>
 								</div>
 							</ng-template>
 							<br>
@@ -59,10 +67,13 @@
 							<button mat-raised-button color="primary" (click)="onNavigate(song)">
 								<mat-icon>play_circle_outline</mat-icon>
 							</button>
-							<button mat-raised-button color="primary" (click)="toggleFavorite(song)" [disabled]="noMoreFavorites(song) || !canModifyFavorite()">
-									<mat-icon *ngIf="isAFavorite(song); else normalSong" class="favorite">favorite</mat-icon>
+							<button mat-raised-button color="primary" (click)="toggleFavorite(song)"
+								[disabled]="noMoreFavorites(song) || !canModifyFavorite()">
+								<mat-icon *ngIf="isAFavorite(song); else normalSong" class="favorite">favorite
+								</mat-icon>
 							</button>
-							<button *ngIf="isCurrentUserSong(song)" [disabled]="!canDeleteSong()" mat-raised-button color="warn" class="cancel" (click)="openDeleteSongWarning(song)">
+							<button *ngIf="isCurrentUserSong(song)" [disabled]="!canDeleteSong()" mat-raised-button
+								color="warn" class="cancel" (click)="openDeleteSongWarning(song)">
 								<mat-icon>cancel</mat-icon>
 							</button>
 						</div>
@@ -83,9 +94,9 @@
 		</tr>
 		<tr *ngFor="let song of getSongs()">
 			<td> {{ song.id }} </td>
-			<td> 
+			<td>
 				<button mat-raised-button color="primary" (click)="openSongNavigator(song)">
-					{{ song.title }} 
+					{{ song.title }}
 				</button>
 			</td>
 			<td> {{ song.author }} </td>
