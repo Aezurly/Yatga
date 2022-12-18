@@ -1,14 +1,13 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, OnDestroy } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { createMessage, CstSongReqAdd, CstSongReqRemove, CstSongResUpdate, EMPTY_SONG, EventType, extractMessageData, Message, Song, SongPlatform } from 'chelys';
+import { createMessage, CstSongReqAdd, CstSongReqRemove, CstSongResUpdate, EventType, extractMessageData, Message, Song, SongPlatform, SONG_AUTHOR_LENGTH, SONG_NAME_LENGTH } from 'chelys';
 import { isEmpty, isNil } from 'lodash';
 import { AuthService } from 'src/app/services/auth.service';
 import { Status } from 'src/app/types/status';
-import { DEFAULT_ID_FROM_URL, getIDFromURL } from 'src/app/types/url';
+import { URLToSongPlatform } from 'src/app/types/url';
 
-const SONG_NAME_LENGTH = 100;	// TODO : ADD TO CHELYS
-const SONG_AUTHOR_LENGTH = 100;
+const ICONS_PATH = "assets/icons";
 
 interface ManageSongsInjectedData {
 	cstID: string;
@@ -20,7 +19,7 @@ interface ManageSongsInjectedData {
 	templateUrl: './manage-songs.component.html',
 	styleUrls: ['./manage-songs.component.scss']
 })
-export class ManageSongsComponent {
+export class ManageSongsComponent implements OnDestroy {
 
 	public songs: Map<number, Song>;
 	public newSongForm: FormGroup;
@@ -38,7 +37,7 @@ export class ManageSongsComponent {
 		this.newSongForm = this.fb.group({
 			title: [, Validators.required],
 			author: [, Validators.required],
-			url: [, Validators.required] // TODO : check if is a correct link
+			url: [, Validators.required]
 		});
 		this.errorStatus = new Status();
 		this.auth.pushEventHandler(this.handleEvents, this);
@@ -61,7 +60,8 @@ export class ManageSongsComponent {
 	private songUpdate(response: CstSongResUpdate) {
 		const songInfo = response.songInfo;
 		switch (response.status) {
-			case "added" || "modified":
+			case "added":
+			case "modified":
 				this.songs.set(songInfo.id, songInfo);
 				break;
 			case "removed":
@@ -96,13 +96,13 @@ export class ManageSongsComponent {
 	addSong(): void {
 		const invalidValues = this.checkFormValidity();
 		if (!isEmpty(invalidValues)) {
-			const text = `Certains champs sont invalides : ${invalidValues.join(', ')}`
+			const text = `Certains champs sont invalides : ${invalidValues.join(', ')}`;
 			this.errorStatus.notify(text, true);
 		} else {
 			const song: Song = {
 				id: -1,
 				user: '',
-				platform: SongPlatform.YOUTUBE,
+				platform: URLToSongPlatform(this.newSongForm.value['url']),
 				title: this.newSongForm.value['title'],
 				author: this.newSongForm.value['author'],
 				url: this.newSongForm.value['url']
@@ -148,13 +148,17 @@ export class ManageSongsComponent {
 		return '';
 	}
 
-	isNotValidURL(): boolean {
-		if (isNil(this.newSongForm.value['url'])) return false;
+	isValidURL(): boolean {
+		const url = this.newSongForm.value['url'];
+		return URLToSongPlatform(url) !== SongPlatform.INVALID_PLATFORM;
+	}
 
-		const song = EMPTY_SONG;
-		song.platform = SongPlatform.YOUTUBE;
-		song.url = this.newSongForm.value['url']
-
-		return getIDFromURL(song) === DEFAULT_ID_FROM_URL;
+	songPlatformFromIcon(): string {
+		const url = this.newSongForm.value['url'];
+		switch (URLToSongPlatform(url)) {
+			case SongPlatform.SOUNDCLOUD: return `${ICONS_PATH}/soundcloud.png`;
+			case SongPlatform.YOUTUBE: return `${ICONS_PATH}/youtube.png`;
+		}
+		return `${ICONS_PATH}/invalid.png`;
 	}
 }

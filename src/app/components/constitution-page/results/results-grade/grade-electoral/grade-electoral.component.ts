@@ -1,13 +1,16 @@
 import { Component, ElementRef, HostListener, Input, OnChanges, ViewChild } from '@angular/core';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { EMPTY_SONG, EMPTY_USER, Song, SongPlatform, User, UserFavorites } from 'chelys';
+import { SafeResourceUrl } from '@angular/platform-browser';
+import { EMPTY_SONG, EMPTY_USER, Song, User, UserFavorites } from 'chelys';
 import { isNil } from 'lodash';
 import { PieData } from 'src/app/types/charts';
 import { mean, randomInRange } from 'src/app/types/math';
 import { SongGradeResult, UserGradeResults } from 'src/app/types/results';
-import { getEmbedURL, getIDFromURL } from 'src/app/types/url';
 import * as confetti from 'canvas-confetti';
 import { FIREWORK_DEFAULTS, FIREWORK_DURATION } from 'src/app/types/firework';
+import { GetUrlService } from 'src/app/services/get-url.service';
+
+const NEXT_RESULT = -1;
+const PREVIOUS_RESULT = 1;
 
 interface VoteData {
   user: User,
@@ -58,12 +61,12 @@ export class GradeElectoralComponent implements OnChanges {
     this.selected = this.currentRank;
     this.range = this.songResults.map((_, index) => index);
     this.currentSong = this.songs.get(this.songResults[this.currentRank].id) || EMPTY_SONG;
-    this.currentSongSafeURL = getEmbedURL(this.songs.get(this.currentSong.id) || EMPTY_SONG, this.sanitizer);
+    this.currentSongSafeURL = this.urlGetter.getEmbedURL(this.songs.get(this.currentSong.id) || EMPTY_SONG);
     this.currentVoters = this.getVotingUser();
     this.generatePieData();
   }
 
-  constructor(private sanitizer: DomSanitizer) {
+  constructor(public urlGetter: GetUrlService) {
     this.onWindowResize();
   }
 
@@ -87,7 +90,7 @@ export class GradeElectoralComponent implements OnChanges {
       
     }, 250);
 
-    this.shouldLaunchFireworks = !this.shouldLaunchFireworks
+    this.shouldLaunchFireworks = !this.shouldLaunchFireworks;
   }
 
   getUser(uid: string): User {
@@ -113,15 +116,6 @@ export class GradeElectoralComponent implements OnChanges {
       return this.favorites.get(user.uid)?.favs.includes(this.currentSong.id);
     });
   }
-
-  getImageURL(): string {
-		switch (this.currentSong.platform) {
-			case SongPlatform.YOUTUBE: {
-				const videoID = getIDFromURL(this.currentSong);
-				return `https://img.youtube.com/vi/${videoID}/mqdefault.jpg`;
-			}
-		}
-	}
 
   meanOfVotes(): number {
     const grades = this.currentVoters.map((v) => v.grade);
@@ -162,7 +156,7 @@ export class GradeElectoralComponent implements OnChanges {
     this.currentRank += shift;
     if (this.currentRank === 0) this.launchFireworks();
     this.currentSong = this.songs.get(this.songResults[this.currentRank].id) || EMPTY_SONG;
-    this.currentSongSafeURL = getEmbedURL(this.songs.get(this.currentSong.id) || EMPTY_SONG, this.sanitizer);
+    this.currentSongSafeURL = this.urlGetter.getEmbedURL(this.songs.get(this.currentSong.id) || EMPTY_SONG);
     this.currentVoters = this.getVotingUser();
     this.generatePieData();
   }
@@ -172,7 +166,7 @@ export class GradeElectoralComponent implements OnChanges {
     const data = new Map<string, PieData>();
     
     for (const user of this.users.keys()) {
-      data.set(user, {name: user, value: 0})
+      data.set(user, {name: user, value: 0});
     }
 
     const results = this.songResults.filter((_, index) => index >= this.currentRank);
@@ -187,12 +181,21 @@ export class GradeElectoralComponent implements OnChanges {
 
     this.pieData = Array.from(data.values()).map((v) => {
       const name = this.getUser(v.name).displayName;
-      return {value: v.value, name}
+      return {value: v.value, name};
     });
   }
 
   isBestQuartert(): boolean {
     return this.currentRank < this.songResults.length / 4;
+  }
+
+  keyPressed(keyEvent: KeyboardEvent): void {
+    if (keyEvent.key === 'ArrowLeft' && !this.isFirstResult()) {
+      this.changeResult(NEXT_RESULT);
+    }
+    else if (keyEvent.key === 'ArrowRight' && !this.isLastResult()) {
+      this.changeResult(PREVIOUS_RESULT);
+    }
   }
 
 }

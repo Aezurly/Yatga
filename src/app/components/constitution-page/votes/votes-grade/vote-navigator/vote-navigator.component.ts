@@ -1,14 +1,17 @@
 import { Component, Inject, OnDestroy } from '@angular/core';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { createMessage, FavReqAdd, FavReqRemove, FavResUpdate, EventType, extractMessageData, FAVORITES_MAX_LENGTH, GradeReqEdit, GradeResUserDataUpdate, GradeUserData, Message, Song, UserFavorites } from 'chelys';
-import { isNil } from 'lodash';
+import { SafeResourceUrl } from '@angular/platform-browser';
+import { createMessage, FavResUpdate, EventType, extractMessageData, GradeReqEdit, GradeResUserDataUpdate, GradeUserData, Message, Song, UserFavorites, Constitution } from 'chelys';
 import { AuthService } from 'src/app/services/auth.service';
-import { getEmbedURL } from 'src/app/types/url';
+import { GetUrlService } from 'src/app/services/get-url.service';
+import { YatgaUserFavorites } from 'src/app/types/extends/favorite';
 import { toMapNumber } from 'src/app/types/utils';
 
+const NEXT_SHIFT = 1;
+const PREVIOUS_SHIFT = -1;
+
 interface VoteNavigatorInjectedData {
-	cstId: string,
+	constitution: Constitution,
 	currentSong: Song,
 	songs: Song[],
 	currentVote: number,
@@ -21,9 +24,9 @@ interface VoteNavigatorInjectedData {
 	templateUrl: './vote-navigator.component.html',
 	styleUrls: ['./vote-navigator.component.scss']
 })
-export class VoteNavigatorComponent implements OnDestroy {
+export class VoteNavigatorComponent extends YatgaUserFavorites implements OnDestroy {
 
-	cstId: string;
+	constitution: Constitution;
 
 	currentSong: Song;
 	currentSongSafeURL: SafeResourceUrl;
@@ -34,18 +37,20 @@ export class VoteNavigatorComponent implements OnDestroy {
 	favorites: UserFavorites;
 
 	constructor(
-		private auth: AuthService,
-		private sanitizer: DomSanitizer,
+		public auth: AuthService,
+		public urlGetter: GetUrlService,
 		private dialogRef: MatDialogRef<VoteNavigatorComponent>,
 		@Inject(MAT_DIALOG_DATA) public data: VoteNavigatorInjectedData
 	) {
-		this.cstId = data.cstId;
+		super();
+
+		this.constitution = data.constitution;
 		this.currentSong = data.currentSong;
 		this.currentVote = data.currentVote;
 		this.songs = data.songs;
 		this.votes = data.votes;
 		this.favorites = data.favorites;
-		this.currentSongSafeURL = getEmbedURL(this.currentSong, this.sanitizer);
+		this.currentSongSafeURL = this.urlGetter.getEmbedURL(this.currentSong);
 
 		this.auth.pushEventHandler(this.handleEvent, this);
 	}
@@ -70,7 +75,7 @@ export class VoteNavigatorComponent implements OnDestroy {
 	}
 
 	vote(grade: number) {
-		const message = createMessage<GradeReqEdit>(EventType.CST_SONG_GRADE_edit, { cstId: this.cstId, voteData: { grade: grade, songId: this.currentSong.id } });
+		const message = createMessage<GradeReqEdit>(EventType.CST_SONG_GRADE_edit, { cstId: this.constitution.id, voteData: { grade: grade, songId: this.currentSong.id } });
 		this.auth.ws.send(message);
 		this.currentVote = grade; // TODO : Necessary ?
 	}
@@ -98,37 +103,20 @@ export class VoteNavigatorComponent implements OnDestroy {
 
 		this.currentSong = this.songs[currentIndex + shift];
 		this.currentVote = this.votes.values.get(this.currentSong.id);
-		this.currentSongSafeURL = getEmbedURL(this.currentSong, this.sanitizer);
+		this.currentSongSafeURL = this.urlGetter.getEmbedURL(this.currentSong);
 	}
+
+	keyPressed(keyEvent: KeyboardEvent): void {
+    if (keyEvent.key === 'ArrowRight' && this.nextSongExist()) {
+      this.changeSong(NEXT_SHIFT);
+    }
+    else if (keyEvent.key === 'ArrowLeft' && this.previousSongExist()) {
+      this.changeSong(PREVIOUS_SHIFT);
+    }
+  }
 
 	closeWindow(): void {
 		this.dialogRef.close();
-	}
-
-	isAFavorite(): boolean {
-		if (isNil(this.favorites)) return false;
-		return this.favorites.favs.includes(this.currentSong.id);
-	}
-
-	toggleFavorite(): void {
-		if (isNil(this.favorites)) return;
-
-		let message: string;
-
-		if (this.favorites.favs.includes(this.currentSong.id)) {
-			// remove the song from favorites
-			message = createMessage<FavReqRemove>(EventType.CST_SONG_FAV_remove, { cstId: this.cstId, songId: this.currentSong.id });
-		} else {
-			// add the song to the favorites
-			message = createMessage<FavReqAdd>(EventType.CST_SONG_FAV_add, { cstId: this.cstId, songId: this.currentSong.id });
-		}
-
-		this.auth.ws.send(message);
-	}
-
-	noMoreFavorties(): boolean {
-		if (isNil(this.favorites)) return false;
-		return FAVORITES_MAX_LENGTH === this.favorites.favs.length && !this.favorites.favs.includes(this.currentSong.id);
 	}
 
 }

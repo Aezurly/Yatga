@@ -1,4 +1,4 @@
-import { Component, Input, SimpleChanges } from '@angular/core';
+import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { Song, User, UserFavorites } from 'chelys';
 import { isNil } from 'lodash';
 import { ChordCategory, ChordLink, ChordNode, HeatmapData } from 'src/app/types/charts';
@@ -9,7 +9,7 @@ import { SongGradeResult, UserGradeResults } from 'src/app/types/results';
   templateUrl: './grade-relationship.component.html',
   styleUrls: ['./grade-relationship.component.scss']
 })
-export class GradeRelationshipComponent {
+export class GradeRelationshipComponent implements OnChanges {
 
   // Input
   @Input() users: Map<string, User> = new Map();
@@ -114,7 +114,7 @@ export class GradeRelationshipComponent {
     this.users.forEach((value) => {
       this.xAxisNames.push(value.displayName);
       this.yAxisNames.push(value.displayName);
-    })
+    });
 
     const users = Array.from(this.users.values());
 
@@ -122,7 +122,7 @@ export class GradeRelationshipComponent {
       const user1 = users[i].uid;
       for (let j = 0; j < users.length; j++) {
         const user2 = users[j].uid;
-        this.heatmapData.push([i, j, user1 === user2 ? 0 : this.countRelations(user1, user2)])
+        this.heatmapData.push([i, j, user1 === user2 ? 0 : this.countRelations(user1, user2)]);
       }
     }
   }

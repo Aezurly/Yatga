@@ -7,8 +7,8 @@ import { TextFieldModule } from '@angular/cdk/text-field';
 import { HttpClientModule } from '@angular/common/http';
 
 // Angular Fire
-import { AngularFireModule } from '@angular/fire';
-import { AngularFireAuthModule, PERSISTENCE } from "@angular/fire/auth";
+import { AngularFireModule } from '@angular/fire/compat';
+import { AngularFireAuthModule, PERSISTENCE } from "@angular/fire/compat/auth";
 import { environment } from '../environments/environment';
 
 // Components
@@ -36,6 +36,7 @@ import { ResultsFavoritesComponent } from './components/constitution-page/result
 import { RandomSongComponent } from './components/constitution-page/random-song/random-song.component';
 import { ManageInvitesComponent } from './components/admin-page/manage-invites/manage-invites.component';
 import { ManageRolesComponent } from './components/admin-page/manage-roles/manage-roles.component';
+import { InvitePageComponent } from './components/invite-page/invite-page.component';
 
 // Charts Component
 import { HistogramComponent } from './components/template/histogram/histogram.component';
@@ -68,7 +69,7 @@ import { MatSliderModule } from "@angular/material/slider";
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatListModule } from '@angular/material/list';
-import { MatTabsModule } from '@angular/material/tabs'
+import { MatTabsModule } from '@angular/material/tabs';
 import { MatDialogModule } from "@angular/material/dialog";
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatExpansionModule } from "@angular/material/expansion";
@@ -87,7 +88,6 @@ import { AppRoutingModule } from './app-routing.module';
 
 // Services
 import { AuthService } from './services/auth.service';
-import { InvitePageComponent } from './components/invite-page/invite-page.component';
 
 @NgModule({
 	declarations: [

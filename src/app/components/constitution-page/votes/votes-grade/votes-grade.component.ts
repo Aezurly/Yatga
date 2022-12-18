@@ -1,16 +1,15 @@
 import { Component, Input, OnDestroy } from '@angular/core';
 import { AuthService } from 'src/app/services/auth.service';
-import { areResultsPublic, canModifySongs, Constitution, createMessage, FavReqAdd, FavReqRemove, CstResUpdate, EMPTY_CONSTITUTION, EMPTY_USER, EventType, extractMessageData, FAVORITES_MAX_LENGTH, GradeReqGetSummary, GradeReqGetUser, GradeResSummaryUpdate, GradeResUserDataUpdate, GradeSummary, GradeUserData, Message, Song, SongPlatform, User, UserFavorites, canModifyVotes } from 'chelys';
+import { canModifySongs, Constitution, createMessage, CstResUpdate, EMPTY_CONSTITUTION, EMPTY_USER, EventType, extractMessageData, GradeReqGetSummary, GradeReqGetUser, GradeResSummaryUpdate, GradeResUserDataUpdate, GradeSummary, GradeUserData, Message, Song, SongPlatform, User, UserFavorites, canModifyVotes } from 'chelys';
 import { MatDialog, MatDialogConfig } from '@angular/material/dialog';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { SafeResourceUrl } from '@angular/platform-browser';
 import { CARDS_SORT_KEY, CARDS_VIEW_KEY, GRADE_SHOW_STATS_KEY, GRADE_ALREADY_VOTES_KEY } from 'src/app/types/local-storage';
 import { mean, variance } from 'src/app/types/math';
-import { compareSongASC, compareSongDSC, compareSongUser } from 'src/app/types/song';
-import { getEmbedURL, getIDFromURL } from 'src/app/types/url';
+import { compareObjectsFactory, toMap, toMapNumber } from 'src/app/types/utils';
 import { VoteNavigatorComponent } from './vote-navigator/vote-navigator.component';
 import { ActivatedRoute } from '@angular/router';
-import { toMap, toMapNumber } from 'src/app/types/utils';
-import { isNil } from 'lodash';
+import { YatgaUserFavorites } from 'src/app/types/extends/favorite';
+import { GetUrlService } from 'src/app/services/get-url.service';
 
 enum GradeOrder {
 	INCREASE,
@@ -23,12 +22,12 @@ enum GradeOrder {
 	templateUrl: './votes-grade.component.html',
 	styleUrls: ['./votes-grade.component.scss']
 })
-export class VotesGradeComponent implements OnDestroy {
+export class VotesGradeComponent extends YatgaUserFavorites implements OnDestroy {
 
 	@Input() constitution: Constitution = EMPTY_CONSTITUTION;
 	@Input() users: Map<string, User> = new Map();
 	@Input() songs: Map<number, Song> = new Map();
-	@Input() favorites: Map<string, UserFavorites> = new Map();
+	@Input() favorites: UserFavorites;
 
 	safeUrls: Map<number, SafeResourceUrl> = new Map();
 	currentIframeSongID: number;
@@ -51,17 +50,20 @@ export class VotesGradeComponent implements OnDestroy {
 	orderByGrade: GradeOrder;
 
 	constructor(
-		private auth: AuthService,
-		private sanitizer: DomSanitizer,
+		public auth: AuthService,
 		private dialog: MatDialog,
 		private route: ActivatedRoute,
+		public urlGetter: GetUrlService
 	) {
+		super();
+
 		this.currentIframeSongID = -1;
 		this.votes = { uid: this.auth.uid, values: new Map() };
 		this.summary = { voteCount: 0, userCount: new Map() };
+		this.favorites = {uid: "", favs: []};
 		this.histogramGrades = [];
 		this.cardsSortASC = (localStorage.getItem(CARDS_SORT_KEY) ?? true) === "false";
-		this.cardsViewEnabled = (localStorage.getItem(CARDS_VIEW_KEY) ?? true) !== "false"
+		this.cardsViewEnabled = (localStorage.getItem(CARDS_VIEW_KEY) ?? true) !== "false";
 		this.showStats = (localStorage.getItem(GRADE_SHOW_STATS_KEY) ?? true) === "true";
 		this.showAlreadyVoted = (localStorage.getItem(GRADE_ALREADY_VOTES_KEY) ?? true) === "true";
 		this.selectedUsers = Array.from(this.users.keys());
@@ -122,34 +124,19 @@ export class VotesGradeComponent implements OnDestroy {
 	}
 
 	getSongsToVote(): Song[] {
-		let songsToVote = Array.from(this.songs.values()).filter(song => {
-			const isNotUserSong = song.user !== this.auth.uid;
-			const isAlreadyVoted = this.votes.values.has(song.id) && this.showAlreadyVoted
-			return isNotUserSong && !isAlreadyVoted && this.isSelected(song.user);
-		});
+		let songsToVote = Array.from(this.songs.values());
 
-		if (this.cardsSortASC) songsToVote = songsToVote.sort(compareSongASC)
-		else songsToVote = songsToVote.sort(compareSongDSC);
+		songsToVote = songsToVote.filter(song => song.user !== this.auth.uid);
+		songsToVote = songsToVote.filter(song => !(this.votes.values.has(song.id) && this.showAlreadyVoted));
+		songsToVote = songsToVote.filter(song => this.isSelected(song.user));
 
-		if (this.orderByUser) songsToVote = songsToVote.sort(compareSongUser);
-
-		if (this.orderByGrade !== GradeOrder.NONE) songsToVote = songsToVote.sort((s1, s2) => {
-			const order = this.orderByGrade === GradeOrder.INCREASE ? 1 : -1;
-
-			const g1 = this.getVote(s1) || 0;
-			const g2 = this.getVote(s2) || 0;
-
-			if (g1 > g2) return order;
-			if (g1 < g2) return -order;
-
-			return 0;
-		})
-
-		if (this.orderByFavs) songsToVote = songsToVote.sort((a, b) => {
-			if (this.isAFavorite(a)) return -1;
-			if (this.isAFavorite(b)) return 1;
-			return 0;
-		})
+		songsToVote.sort(compareObjectsFactory("id", !this.cardsSortASC));
+		if (this.orderByUser) 
+			songsToVote = songsToVote.sort(compareObjectsFactory<Song>((s:Song) => this.users.get(s.user) + s.user, false));
+		if (this.orderByGrade !== GradeOrder.NONE)
+			songsToVote = songsToVote.sort(compareObjectsFactory<Song>((s: Song) => this.getVote(s) || 0, this.orderByGrade == GradeOrder.DECREASE));
+		if (this.orderByFavs)
+			songsToVote = songsToVote.sort(compareObjectsFactory<Song>((s: Song) => this.isAFavorite(s), true));
 
 		return songsToVote;
 	}
@@ -164,7 +151,7 @@ export class VotesGradeComponent implements OnDestroy {
 
 	getMean(): string {
 		const values = Array.from(this.votes.values).map((value) => value[1]);
-		const meanValue = mean(values).toFixed(3)
+		const meanValue = mean(values).toFixed(3);
 		return meanValue === 'NaN' ? '0.000' : meanValue;
 	}
 
@@ -177,13 +164,13 @@ export class VotesGradeComponent implements OnDestroy {
 		const config = new MatDialogConfig();
 
 		config.data = {
-			cstId: this.constitution.id,
+			constitution: this.constitution,
 			currentSong: song,
 			currentVote: this.getVote(song),
 			songs: this.getSongsToVote(),
 			votes: this.votes,
-			favorites: this.favorites.get(this.auth.uid)
-		}
+			favorites: this.favorites
+		};
 
 		this.dialog.open(VoteNavigatorComponent, config);
 		this.currentIframeSongID = -1;
@@ -222,18 +209,9 @@ export class VotesGradeComponent implements OnDestroy {
 		return this.users.get(uid) || EMPTY_USER;
 	}
 
-	getImageURL(song: Song): string {
-		switch (song.platform) {
-			case SongPlatform.YOUTUBE: {
-				const videoID = getIDFromURL(song);
-				return `https://img.youtube.com/vi/${videoID}/mqdefault.jpg`;
-			}
-		}
-	}
-
 	getSongSafeURL(song: Song): SafeResourceUrl {
 		if (!this.safeUrls.has(song.id)) {
-			this.safeUrls.set(song.id, getEmbedURL(song, this.sanitizer));
+			this.safeUrls.set(song.id, this.urlGetter.getEmbedURL(song));
 		}
 
 		return this.safeUrls.get(song.id) || '';
@@ -245,7 +223,7 @@ export class VotesGradeComponent implements OnDestroy {
 
 	// FILTER FUNCTIONS
 	toggleUserFilter(uid: string): void {
-		const index = this.selectedUsers.findIndex((user) => { return user === uid });
+		const index = this.selectedUsers.findIndex((user) => { return user === uid; });
 		if (index !== -1) {
 			this.selectedUsers.splice(index, 1);
 		} else {
@@ -280,36 +258,11 @@ export class VotesGradeComponent implements OnDestroy {
 	resetOrder() {
 		this.setOrderByUser(false);
 		this.setOrderByFavs(false);
+		this.setOrderByGrade(GradeOrder.NONE);
 	}
 
-	// TODO : Implement class ?
-	isAFavorite(song: Song): boolean {
-		const userFavorites = this.favorites.get(this.auth.uid);
-		if (isNil(userFavorites)) return false;
-		return userFavorites.favs.includes(song.id);
+	userFilterTooltip(uid: string, displayName: string): string {
+		const status = !this.selectedUsers.includes(uid) ? "Cacher" : "Afficher";
+		return `${status} ${displayName}`;
 	}
-
-	toggleFavorite(song: Song): void {
-		const userFavorites = this.favorites.get(this.auth.uid);
-		if (isNil(userFavorites)) return;
-
-		let message: string;
-
-		if (userFavorites.favs.includes(song.id)) {
-			// remove the song from favorites
-			message = createMessage<FavReqRemove>(EventType.CST_SONG_FAV_remove, { cstId: this.constitution.id, songId: song.id });
-		} else {
-			// add the song to the favorites
-			message = createMessage<FavReqAdd>(EventType.CST_SONG_FAV_add, { cstId: this.constitution.id, songId: song.id });
-		}
-
-		this.auth.ws.send(message);
-	}
-
-	noMoreFavorties(song: Song): boolean {
-		const userFavorites = this.favorites.get(this.auth.uid);
-		if (isNil(userFavorites)) return false;
-		return FAVORITES_MAX_LENGTH === userFavorites.favs.length && !userFavorites.favs.includes(song.id);
-	}
-
 }

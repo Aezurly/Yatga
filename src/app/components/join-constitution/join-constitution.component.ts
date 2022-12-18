@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatDialogRef } from '@angular/material/dialog';
 import { Router } from '@angular/router';
@@ -11,7 +11,7 @@ import { Status } from 'src/app/types/status';
   templateUrl: './join-constitution.component.html',
   styleUrls: ['./join-constitution.component.scss']
 })
-export class JoinConstitutionComponent {
+export class JoinConstitutionComponent implements OnDestroy {
 
   public errorStatus: Status;
 	public joinForm: FormGroup;
@@ -24,7 +24,7 @@ export class JoinConstitutionComponent {
   ) {
     this.joinForm = this.fb.group({
       id: [, Validators.required]
-    })
+    });
     this.errorStatus = new Status();
     this.auth.pushEventHandler(this.handleEvents, this);
   }
@@ -40,7 +40,7 @@ export class JoinConstitutionComponent {
       if (data.success) {
         this.errorStatus.clearStatus();
         this.router.navigateByUrl(`/constitution/${this.joinForm.get('id')?.value}/songList`);
-        this.closeWindow()
+        this.closeWindow();
       } else {
         switch (data.status) {
           case "no_constitution":
@@ -61,7 +61,7 @@ export class JoinConstitutionComponent {
 
   sendRequest(): void {
     const cstID = this.joinForm.get('id')?.value;
-    const joinConstitutionMessage = createMessage(EventType.CST_join, { id: cstID })
+    const joinConstitutionMessage = createMessage(EventType.CST_join, { id: cstID });
     this.auth.ws.send(joinConstitutionMessage);
   }
 
